@@ -1,8 +1,8 @@
-import com.google.gson.JsonObject;
-
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 
 
@@ -12,7 +12,7 @@ public class DomainDriverDesign {
         ActorOrRole("角色")
         ,CommandOrAction("命令/动作")
         ,QueryModel("查询模型")
-        ,AggregateOrBusinessRule("聚合/业务规则约束")
+        ,AggregateOrBusinessRule("聚合/业务规则约束/过程/订单")
         ,Domain("领域")
         ,DomainEvent("领域事件")
         ,ExternalSystem("外部系统")
@@ -119,7 +119,7 @@ class Frontend{
 class Backend{
     interface Domain{}
     enum DomainEventType{
-
+        NULL
     }
     interface DomainEvent{
         DomainEventType type();
@@ -137,11 +137,25 @@ class Backend{
     }
 
     void apiWithEvent(Object req){
-        ConditionEvent event = new ConditionEvent(req);
-        ConditionEventDispatcher dispatcher = new ConditionEventDispatcher();
-        if(!dispatcher.check(event))
-            return;
-        //dispatch events
+        final ConditionEvent event = new ConditionEvent(req);
+        //lock try if check done then emit event else if check not done then return finally unlock
+        Lock lock = new ReentrantLock();
+        ConditionEventChecker checker = new ConditionEventChecker();
+        lock.lock();
+        try{
+            if(!checker.check(event))
+                return;
+            Backend.getInstance().emit(new DomainEvent(){
+                final ConditionEvent c = event;
+                @Override
+                public DomainEventType type() {
+                    return DomainEventType.NULL;
+                }
+            });
+        }finally{
+            lock.unlock();
+        }
+
     }
 }
 class ConditionEvent{
@@ -151,7 +165,7 @@ class ConditionEvent{
 class ConditionListener{
     public boolean pass(ConditionEvent evt){ return true;}
 }
-class ConditionEventDispatcher{
+class ConditionEventChecker {
     List<ConditionListener> listeners = new LinkedList<>();
     boolean check(ConditionEvent event){
         for (ConditionListener listener : listeners) {
