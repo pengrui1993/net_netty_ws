@@ -1,6 +1,4 @@
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
@@ -161,6 +159,7 @@ class Backend{
 class ConditionEvent{
     public ConditionEvent(Object req) {
     }
+    public final Map<Class<?>,Object> reposGetter = new HashMap<>();
 }
 class ConditionListener{
     public boolean pass(ConditionEvent evt){ return true;}
@@ -168,9 +167,16 @@ class ConditionListener{
 class ConditionEventChecker {
     List<ConditionListener> listeners = new LinkedList<>();
     boolean check(ConditionEvent event){
-        for (ConditionListener listener : listeners) {
-            if(!listener.pass(event))
-                return false;
+        ConditionListener ref = null;
+        try{
+            for (ConditionListener listener : listeners) {
+                ref = listener;
+                if(!listener.pass(event))
+                    return false;
+            }
+        }catch (Throwable t){
+            System.err.println("check error from:"+ref.getClass());
+            t.printStackTrace(System.err);
         }
         return true;
     }
